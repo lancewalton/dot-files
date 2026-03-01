@@ -1,0 +1,155 @@
+---
+name: Laminar UI Development
+description: Laminar reactive UI patterns for Scala.js frontend. Use when implementing or modifying frontend components, form fields, or reactive list rendering in Laminar.
+---
+
+# Laminar UI Development
+
+## Reactive List Rendering
+
+**ALWAYS** use the `split` operator with stable keys when rendering lists from signals. **NEVER** recreate DOM elements on signal updates.
+
+### Why
+
+When a `Signal[List[T]]` is mapped directly to DOM elements, Laminar recreates the entire DOM subtree on every signal emission. For form fields, this causes **focus loss on every keystroke** — the input element is destroyed and a new one is created, so the cursor disappears.
+
+### Wrong — recreates DOM on every update
+
+```scala
+// BAD: entire list re-rendered on any change, inputs lose focus
+itemsSignal.map { items =>
+  items.map { item =>
+    input(
+      value := item.name,
+      onInput.mapToValue --> { v => updateItem(item.id, v) }
+    )
+  }
+}
+```
+
+### Correct — stable elements via split
+
+```scala
+// GOOD: split tracks items by stable key, only updates changed elements
+children <-- itemsSignal.split(_.id) { (id, initial, itemSignal) =>
+  input(
+    controlled(
+      value <-- itemSignal.map(_.name),
+      onInput.mapToValue --> { v => updateItem(id, v) }
+    )
+  )
+}
+```
+
+### Rules
+
+1. **Every list signal rendering MUST use `split` with a stable key** (e.g. an ID field, not an index)
+2. **Use `controlled`** for form inputs bound to signals — this pairs `value <-- signal` with an `onInput` handler
+3. **Never use `.map` on a `Signal[List[T]]` to produce child elements** — this is always a bug for interactive content
+4. **If items lack a natural key**, add a `UUID` or incrementing `ID` field when creating them
+
+## Accessing Signal State in Click Handlers
+
+Use `onClick.compose(_.withCurrentValueOf(signal))` to read the current value of a signal at click time. This avoids stale closures and removes the need for auxiliary `Var`s.
+
+### Wrong — stale closure captures initial value
+
+```scala
+// BAD: signal value captured once at element creation, never updated
+val currentItem = itemSignal.now()
+onClick.mapTo(doSomething(currentItem)) --> observer
+```
+
+### Correct — reads signal at click time
+
+```scala
+// GOOD: withCurrentValueOf samples the signal on each click
+onClick.compose(_.withCurrentValueOf(itemSignal).map { case (_, item) =>
+  doSomething(item)
+}) --> observer
+```
+
+### Common use cases
+
+- **Conditional actions**: decide which event to emit based on current state (e.g. toggle selection)
+- **Dynamic payloads**: include current signal values in the emitted event
+- **Multiple signals**: chain `.withCurrentValueOf(s1).withCurrentValueOf(s2)` to sample several signals
+
+## Controlled Inputs for Programmatic Updates
+
+**ALWAYS** use `controlled` when an input's value can be updated programmatically (e.g. via a button click that calls `myVar.set(...)`). An uncontrolled input with `value := initial` only sets the DOM value once at creation — subsequent `Var.set()` calls update the `Var` but the DOM input remains unchanged.
+
+### Wrong — DOM ignores programmatic Var updates
+
+```scala
+// BAD: value := sets DOM once; clicking "Suggest" updates the Var but the input still shows the old text
+val pattern: Var[String] = Var("")
+input(
+  value := "",
+  onInput.mapToValue --> pattern
+)
+button("Suggest", onClick --> { _ => pattern.set("inferred_value") }) // input doesn't change
+```
+
+### Correct — controlled input reflects Var changes
+
+```scala
+// GOOD: controlled binds the DOM input to the signal, so programmatic .set() is visible
+val pattern: Var[String] = Var("")
+input(
+  controlled(
+    value <-- pattern.signal,
+    onInput.mapToValue --> pattern
+  )
+)
+button("Suggest", onClick --> { _ => pattern.set("inferred_value") }) // input updates
+```
+
+### Rule
+
+If a `Var` backing an input can be modified from **anywhere other than the input itself** (buttons, external events, signal updates), the input **must** use `controlled`. Reserve `value := initial` only for truly static initial values with no programmatic updates.
+
+## Prefer Stream Transformation + `-->` Over `Var.set` in Event Handlers
+
+When an event handler's only purpose is to transform a value and write it to a `Var`, lift the transformation into the stream instead of calling `Var.set` inside `-->`. Since `Var[A]` is an `Observer[A]`, `-->` can write directly to it.
+
+### Common variants
+
+| Smell | Refactored |
+|---|---|
+| `onChange.mapToValue --> { v => myVar.set(f(v)) }` | `onChange.mapToValue.map(f) --> myVar` |
+| `onClick --> { _ => myVar.set(constant) }` | `onClick.mapTo(constant) --> myVar` |
+| `stream --> { event => myVar.set(Some(event)) }` | `stream.map(Some(_)) --> myVar` |
+
+### Wrong — imperative `Var.set` inside handlers
+
+```scala
+// BAD: transformation buried in handler
+onChange.mapToValue --> { v =>
+  if (v.isEmpty) selectedId.set(None)
+  else selectedId.set(Some(ID(v)))
+}
+
+// BAD: ignoring event just to set a constant
+onClick --> { _ => suggestResults.set(None) }
+
+// BAD: wrapping in Some for no reason
+inferenceEvents --> { event => fetchResult.set(Some(event)) }
+```
+
+### Correct — declarative stream transformation
+
+```scala
+// GOOD: map in the stream, --> writes to the Var
+onChange.mapToValue.map(ID.fromString[MyType]) --> selectedId
+
+// GOOD: mapTo for constant values
+onClick.mapTo(None) --> suggestResults
+
+// GOOD: map for simple wrapping
+inferenceEvents.map(Some(_)) --> fetchResult
+```
+
+### Rule
+
+If the right-hand side of `-->` contains only a single `Var.set` call, refactor to stream transformation + `-->`. Reserve `Var.set` for cases where multiple `Var`s must be updated, side effects beyond a single write are needed, or conditional logic determines whether to write at all.
