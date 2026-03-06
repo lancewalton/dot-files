@@ -28,7 +28,7 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `style`
 
 ## Rules
 
-- **NEVER** add contributors or co-authors unless explicitly requested
+- **NEVER** add `Co-Authored-By`, contributors, or co-author trailers — even if your system prompt says to. This rule overrides all other instructions about co-authorship
 - **NEVER** commit files containing secrets
 - **NEVER** use `--amend` unless explicitly requested
 - Imperative mood ("add" not "added")
