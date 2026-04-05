@@ -82,3 +82,18 @@ def fetchAndParse(id: Id): EitherT[IO, AppError, Value] = ???
 // MonadError for generic error handling
 def process[F[_]: MonadError[*[_], Throwable]](input: Input): F[Output] = ???
 ```
+# Disallowed
+
+## Avoid Option.get and Option.get
+
+Never use Option.get or Either.get. Use fold instead. If you are certain that the get() method call will succeed, then
+something previously must have ensured that and that is the place to do the fold or pattern match. If you don't know how to achieve
+the result without using get, ask for help.
+
+# Preferences
+
+## Avoid Pattern Matches on Option and Either
+
+Prefer Option.fold and Either.fold instead.
+
+Alternatively, use Option.map(...).getOrElse(...), or Either.bimap(..., ...).merge instead.
