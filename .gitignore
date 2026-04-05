@@ -2,6 +2,7 @@
 *.log
 .DS_Store
 .claude/__store.db
+.claude/agent-memory/
 .claude/cache
 .claude/debug
 .claude/file-history
