@@ -21,6 +21,7 @@
 .claude/stats-cache.json
 .claude/statsig
 .claude/tasks
+.claude/telemetry
 .claude/todos
 .claude/usage-data
 .config/iterm2
