@@ -133,7 +133,7 @@ class EnumerationInferenceProcessor[F[_]: Concurrent](
 - **File placement**: same directory as the source file
 - **`apply` carries the same type parameters and context bounds** as the original method
 - **Helpers receive only what they need** — don't pass parameters that are already class fields (for the class variant)
-- **After extraction**: update the original file to delegate to the new type, remove the moved private methods
+- **After extraction**: inline the method object call at every call site of the original method, then delete the original method entirely. Don't leave a thin delegating wrapper — the call site should read `HandlerName(args)` directly
 - **Move relevant tests**: if existing tests exercise the extracted logic through the original entry-point, move them to test the method object directly. The original delegation call is a one-liner that doesn't need its own tests — the real logic now lives in the method object and that's what tests should target
 
 ## What NOT to Do
