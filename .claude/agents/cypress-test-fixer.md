@@ -2,6 +2,7 @@
 name: cypress-test-fixer
 description: Fixes critical code review findings in cypress tests. Receives review findings, applies targeted fixes, and verifies tests pass. Used by the cypress-testing-fix-loop skill.
 tools: Read, Grep, Glob, Bash, Edit, Write
+color: green
 model: opus
 ---
 
