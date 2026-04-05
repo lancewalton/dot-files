@@ -153,3 +153,74 @@ inferenceEvents.map(Some(_)) --> fetchResult
 ### Rule
 
 If the right-hand side of `-->` contains only a single `Var.set` call, refactor to stream transformation + `-->`. Reserve `Var.set` for cases where multiple `Var`s must be updated, side effects beyond a single write are needed, or conditional logic determines whether to write at all.
+
+## Never Use `Var.now()` Inside Observer Callbacks
+
+`Var.set`/`Var.update` inside an Airstream transaction (any Observer callback) **queues** the new value — it is not committed until the transaction ends. Calling `Var.now()` after a `set`/`update` in the same callback returns the **pre-transaction** value, silently producing stale reads.
+
+### Wrong — stale state from `now()` inside transaction
+
+```scala
+// BAD: pendingVar.now() returns pre-update value after set
+val handler: Observer[Event] = Observer { event =>
+  val current = pendingVar.now()
+  val updated = current - event.id
+  pendingVar.set(updated)
+  if pendingVar.now().isEmpty then  // STILL SEES OLD VALUE — never true!
+    complete()
+}
+```
+
+### Correct — use `withCurrentValueOf` at the stream pipeline
+
+```scala
+// GOOD: state sampled before the transaction begins
+eventStream
+  .withCurrentValueOf(pendingVar.signal)
+  --> { (event, current) =>
+    val updated = current - event.id
+    pendingVar.set(updated)
+    if updated.isEmpty then complete()
+  }
+```
+
+### Rules
+
+1. **Never read `Var.now()` after `set`/`update` in the same Observer** — the value hasn't committed yet
+2. **Use `withCurrentValueOf`** to sample signal state at event time, before the transaction starts
+3. **If you must read state inside an Observer**, read it **once at the top** before any writes, compute the new state locally, then write once — never read back after writing
+4. **`combineWith` + `withCurrentValueOf` flattens tuples** — `stream.withCurrentValueOf(sig1.combineWith(sig2))` produces `EventStream[(Event, A, B)]`, not `EventStream[(Event, (A, B))]`
+
+## Consolidate Related Vars Into Case Classes
+
+When multiple `Var`s represent a single state machine (e.g. `Var[Set[X]]` for pending items, `Var[Map[X, Y]]` for results, `Var[Boolean]` for in-progress), consolidate them into a single `Var[StateCase]`. This prevents cross-Var consistency bugs and eliminates multiple `now()` calls.
+
+### Wrong — scattered state across multiple Vars
+
+```scala
+// BAD: four Vars for one state machine, must coordinate updates
+private val pending: Var[Set[ID]]           = Var(Set.empty)
+private val results: Var[Map[ID, Result]]   = Var(Map.empty)
+private val total: Var[Int]                 = Var(0)
+private val inProgress: Var[Boolean]        = Var(false)
+```
+
+### Correct — single Var with case class
+
+```scala
+// GOOD: atomic state, one set() updates everything consistently
+case class Progress(
+  inProgress: Boolean,
+  total: Int,
+  pending: Set[ID],
+  results: Map[ID, Result]
+)
+object Progress:
+  val idle: Progress = Progress(false, 0, Set.empty, Map.empty)
+
+private val progress: Var[Progress] = Var(Progress.idle)
+
+// Derive individual signals for the UI
+val pendingSignal: Signal[Set[ID]]   = progress.signal.map(_.pending)
+val isActiveSignal: Signal[Boolean]  = progress.signal.map(_.inProgress)
+```
