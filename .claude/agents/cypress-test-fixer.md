@@ -29,6 +29,16 @@ You will receive:
 - **No scope creep** — do not refactor, improve, or tidy surrounding code
 - **Revert on failure** — if a fix breaks tests, revert it and mark as unfixable
 
+## Critical: `.type()` vs `.setLaminarInput()` — Check the Binding First
+
+**NEVER blindly replace `.clear().type()` with `.setLaminarInput()`.** The correct method depends on the Scala form's event binding:
+
+- `onInput.mapToValue` or `controlled(..., onInput.mapToValue)` → use `.setLaminarInput(value)` (prevents Laminar signal race)
+- `onChange.mapToValue` → **keep `.clear().type(value)`** (`setLaminarInput` only dispatches `input`, not `change`, so the value silently fails to commit)
+- Dual binding (`onInput` + `onChange`) → **keep `.clear().type(value)`** (the `onChange` observer needs real keyboard events)
+
+**Before changing any input method**, grep the Scala source for the input's placeholder text, `data-testid`, or field name to find the form file, then check whether it uses `onInput` or `onChange`. Forms that commonly use `onChange`: `RelationshipEditorForm`, `NullCohortEditorForm`, `KeyEditorForm`, `MatcherEditor`.
+
 ## Test Verification
 
 Run the cypress test suite after fixing all findings:

@@ -16,6 +16,7 @@
 .claude/plugins/known_marketplaces.json
 .claude/plugins/marketplaces/superpowers-marketplace
 .claude/projects
+.claude/sessions
 .claude/settings.json.backup
 .claude/settings.local.json
 .claude/shell-snapshots
