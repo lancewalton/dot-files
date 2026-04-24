@@ -36,6 +36,28 @@ sbt "testOnly *SpecName*"
 
 2. **ALWAYS** run `sbt commitCheck` after completing code changes.
 
+## Before Committing Scala Changes
+
+Before committing any non-trivial Scala edit — TDD refactor phase, bug fix, feature work, standalone refactor — run these structural fix-loops on the changed files. `commitCheck` verifies correctness; these verify structural quality. Both are required.
+
+1. Invoke `Skill fix-method-structure <files>` — runs the method-structure-reviewer/fixer fix-loop until the diff is clean of >2-line lambda/case bodies, multi-control-structure methods, and other extract-method opportunities.
+2. Invoke `Skill fix-primitive-obsession <files>` — runs the primitive-obsession-reviewer/fixer fix-loop until method signatures and case-class fields no longer carry raw String/Int/Tuple primitives where domain types fit.
+
+**Always pass an explicit file scope** — the GREEN-phase commit plus any uncommitted refactor changes. Compute it like:
+
+```bash
+git diff --name-only HEAD~1 HEAD  # GREEN commit files
+git diff --name-only HEAD          # uncommitted refactor edits
+```
+
+Pass the union as positional args. Without an explicit scope, `fix-loop` defaults to `HEAD~3` and will pick up two previous commits' files unrelated to this change.
+
+Both wrap their underlying agents via `fix-loop`, so iteration to clean is automatic. Order: method-structure first (extracts blocks into named methods), then primitive-obsession (catches the resulting signatures). Either order converges.
+
+### Red Flags — don't skip the fix-loops
+- "This is a targeted bug fix, not TDD, so the hooks don't apply." They apply to any non-trivial Scala edit. If the diff contains real logic changes, run them.
+- "commitCheck passed, I'm ready to commit." commitCheck is necessary, not sufficient.
+
 ## Testing (MUnit)
 
 ```scala

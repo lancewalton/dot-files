@@ -63,6 +63,12 @@ Language-specific test syntax provided by language skills (scala-developer, ruby
 | Bug fix | Write test reproducing bug first, then fix |
 | Refactoring | Add tests for current behaviour first, then refactor |
 
+## Code Style
+
+- **Default to no comments.** Add one only when the WHY is non-obvious — a hidden constraint, a subtle invariant, a workaround for a specific bug.
+- **Don't reference the current task, fix, issue number, PR, or callers in comments** — those belong in the commit message and rot as the codebase evolves.
+- **Don't explain WHAT the code does** — well-named identifiers do that. Comments say WHY, not WHAT.
+
 ## Common Mistakes
 
 See `references/common-mistakes.md` for anti-patterns to avoid.

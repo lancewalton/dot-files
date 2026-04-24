@@ -6,7 +6,7 @@ description: Improve code design without changing behaviour. Use when restructur
 # Refactor
 
 ## Core Rules (Non-Negotiable)
-
+@
 1. **NEVER change behaviour** — refactoring preserves existing functionality
 2. **All tests must pass** before starting and after completing
 3. **Small incremental changes** — commit after each successful refactoring

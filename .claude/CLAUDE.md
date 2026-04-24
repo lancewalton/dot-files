@@ -20,6 +20,7 @@
 - **ALWAYS** use bash `date` when creating timestamps and dates
 - **NEVER** expand the scope of tasks
 - **ALWAYS** look for appropriate skills before performing tasks
+- **ALWAYS** when delegating non-trivial coding work to a subagent (especially `general-purpose`), tell it explicitly which skills to invoke — e.g. "invoke `Skill development` for TDD" or "invoke `Skill scala-developer`". Subagents don't auto-discover skills the way I do, and the rules in those skills won't apply unless the subagent loads them.
 - **ALWAYS** after completing a task, review whether lessons learned should be captured in skills — update existing skills with new patterns or corrections, remove outdated guidance, or create new skills when reusable patterns emerge
 - **ALWAYS** whenever looking for `CLAUDE.md` files, also look for `AGENTS.md` files in the same directories and read them for additional context
 - Questions format: Bold **Question❓**
