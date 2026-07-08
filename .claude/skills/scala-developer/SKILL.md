@@ -27,6 +27,9 @@ bloop test <module-name> -o "*<filename>*"
 ```
 Module name is `root` for non-modular projects.
 
+**Scala.js test modules don't run under bloop** (`Missing configured test frameworks`) — run them with
+`sbt <jsModule>/testOnly '*Spec*'`. bloop still *compiles* JS, it just can't execute its tests.
+
 **If no `.bloop` — use sbt:**
 ```bash
 sbt compile

@@ -5,6 +5,12 @@ description: Laminar reactive UI patterns for Scala.js frontend. Use when implem
 
 # Laminar UI Development
 
+## Testing reactive logic
+
+Extract the pure decision from the stream wiring so it unit-tests without a DOM (e.g. an
+`event => Option[State]` mapping), and cover the Airstream/subscription/navigation wiring with a Cypress
+E2E. Don't try to unit-test `EventStream`/`Var` plumbing directly.
+
 ## Reactive List Rendering
 
 **ALWAYS** use the `split` operator with stable keys when rendering lists from signals. **NEVER** recreate DOM elements on signal updates.
