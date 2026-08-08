@@ -197,6 +197,67 @@ eventStream
 3. **If you must read state inside an Observer**, read it **once at the top** before any writes, compute the new state locally, then write once — never read back after writing
 4. **`combineWith` + `withCurrentValueOf` flattens tuples** — `stream.withCurrentValueOf(sig1.combineWith(sig2))` produces `EventStream[(Event, A, B)]`, not `EventStream[(Event, (A, B))]`
 
+## An EventStream Has No Current Value — Share a Signal, Never a Late Subscription
+
+An Airstream `EventStream` carries no current value and does **not** replay. A second subscriber that arrives
+after the stream has already been started by a first one receives **nothing** until the next emission — which,
+for a mount-time feed or a GET-and-refresh, may never come.
+
+This fails **silently**. No error, no log, no exception: the feature simply does nothing, which reads to the
+user as "the app ignored me". It is one of the hardest classes of bug to spot by reading, because both
+subscriptions look perfectly reasonable in isolation.
+
+### Wrong — the second consumer is a late subscriber
+
+```scala
+// BAD: `children <--` starts the stream; the per-row handler subscribes AFTER and never sees a value,
+// so `combineWith` never produces and the drop silently does nothing.
+tbody(
+  children <-- sortedData.map(...).split(...) { ... =>
+    tr(
+      onDrop.preventDefault
+        .compose(_.combineWith(sortedData.take(1)).flatMapSwitch { ... }) --> ()
+    )
+  }
+)
+```
+
+### Correct — one Signal, shared by every consumer
+
+```scala
+// GOOD: a Signal memoises its current value, so whichever consumer starts it, both read the same list.
+val rows: Signal[List[T]] = sortedData.startWith(Nil)
+
+tbody(
+  children <-- rows.map(...).split(...) { ... =>
+    tr(
+      onDrop.preventDefault
+        .compose(_.withCurrentValueOf(rows).flatMapSwitch { ... }) --> ()
+    )
+  }
+)
+```
+
+### Rules
+
+1. **If two consumers need the same stream, convert once to a `Signal` and share that one instance.** Do not
+   subscribe to the stream twice.
+2. **Do not "fix" it by adding a second binder** (`stream --> someVar.writer` alongside `children <-- stream`).
+   That only moves the problem: Laminar mounts binders in the order they are added, so whichever mounts first
+   starts the stream and gets the value, and the other is now the late subscriber — which can leave a table
+   rendering *empty* instead of merely failing to reorder.
+3. **`.take(1)` on a shared stream is a red flag.** It reads as "just give me the current value", which is
+   exactly what an EventStream cannot do. Reach for a `Signal` and `withCurrentValueOf`.
+4. **A local `Var` mirror is a legitimate cure only for the consumer that owns it** — it does not help a
+   *different* consumer further down the tree that is still subscribing late.
+
+### The `split` companion trap
+
+A row body built by `.split` closes over the item value captured **when that row first rendered**. Anything
+that locates by that captured value (`list.indexOf(item)`) breaks the moment the row is edited — the lookup
+returns `-1` and the operation silently misbehaves. **Locate by id against the list as it stands now**, and
+take the element from that list rather than from the closure.
+
 ## Consolidate Related Vars Into Case Classes
 
 When multiple `Var`s represent a single state machine (e.g. `Var[Set[X]]` for pending items, `Var[Map[X, Y]]` for results, `Var[Boolean]` for in-progress), consolidate them into a single `Var[StateCase]`. This prevents cross-Var consistency bugs and eliminates multiple `now()` calls.
