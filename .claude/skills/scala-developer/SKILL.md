@@ -14,6 +14,7 @@ Uses `development` skill for TDD workflow.
 - Prefer Typelevel ecosystem (cats, cats-effect, fs2)
 - Use ADTs for domain modelling
 - Errors as values (Either, EitherT, MonadError)
+- Before adding a new top-level name (object/class/trait/given/extension), grep the **bare** name across every definition kind — a clash with an existing `implicit class`/`given` in a package object doesn't surface until the full compile, then cascades as "`X` is not a member" everywhere.
 
 ## Compilation Priority
 
@@ -37,7 +38,7 @@ sbt test
 sbt "testOnly *SpecName*"
 ```
 
-2. **ALWAYS** run `sbt commitCheck` after completing code changes.
+2. **ALWAYS** run `sbt commitCheck` after completing code changes. A scoped `testOnly` / `bloop test <file>` is an **incremental** run and can pass green while the whole module fails to compile — never treat a `testOnly` green as clearance to commit.
 
 ## Before Committing Scala Changes
 
