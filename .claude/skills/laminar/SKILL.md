@@ -258,6 +258,14 @@ that locates by that captured value (`list.indexOf(item)`) breaks the moment the
 returns `-1` and the operation silently misbehaves. **Locate by id against the list as it stands now**, and
 take the element from that list rather than from the closure.
 
+The same applies to **attributes set from `initial`**. `attr := f(initial)` is frozen at first render, while
+`child <-- item$.map(...)` beside it keeps moving, so the row can show one thing and carry another. On
+2026-10-24 a filter pill's `dataName := name(initial)` stayed at a bare "Analysed" after its label gained
+"— Solo", because the derived value (here, ambiguity across the whole list) changed under a stable key. A nightly
+Cypress lookup then timed out on about half of runs. Anything derived from more than the item's own stable
+identity, **test handles included**, must be `attr <-- item$.map(f)`. A Cypress flake that "never finds" an
+element the screenshot plainly shows is this trap until proven otherwise.
+
 ## Consolidate Related Vars Into Case Classes
 
 When multiple `Var`s represent a single state machine (e.g. `Var[Set[X]]` for pending items, `Var[Map[X, Y]]` for results, `Var[Boolean]` for in-progress), consolidate them into a single `Var[StateCase]`. This prevents cross-Var consistency bugs and eliminates multiple `now()` calls.
