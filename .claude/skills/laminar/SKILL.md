@@ -197,6 +197,26 @@ eventStream
 3. **If you must read state inside an Observer**, read it **once at the top** before any writes, compute the new state locally, then write once — never read back after writing
 4. **`combineWith` + `withCurrentValueOf` flattens tuples** — `stream.withCurrentValueOf(sig1.combineWith(sig2))` produces `EventStream[(Event, A, B)]`, not `EventStream[(Event, (A, B))]`
 
+## Read a Control's Change ONCE — a Second Listener Sees the Reset Value
+
+Two `-->` bindings off the same `onChange` run as two DOM listeners, in order. If the first writes a Var that feeds
+the control's own `value <--`, that write runs a transaction synchronously and puts the DOM value back **before** the
+second listener reads `mapToValue`. The second then acts on the old value — usually by doing nothing. (2026-10-28: a
+"Skills asked" select sent no PATCH; pure-decision unit tests were green, only Cypress showed it.)
+
+```scala
+// Wrong — the commit listener reads the select after `picking` reset it
+chosen.map(_ == Mode.Specific) --> picking,
+chosen.compose(_.withCurrentValueOf(filter$).flatMapSwitch(commitFor)) --> ()
+
+// Correct — one observer reads the choice, sets local state, and emits the request onto a bus
+onChange.mapToValue.compose(_.withCurrentValueOf(filter$)) --> { case (v, filter) =>
+  requestFor(filter, v).foreach(requests.emit)
+  picking.set(v == "specific")
+},
+requests.events.flatMapSwitch(commit) --> ()
+```
+
 ## An EventStream Has No Current Value — Share a Signal, Never a Late Subscription
 
 An Airstream `EventStream` carries no current value and does **not** replay. A second subscriber that arrives
